@@ -1,0 +1,85 @@
+#! /usr/bin/python
+import argparse
+import gpiozero
+import math
+import sys
+import time
+
+##############################################
+
+def blinkPinLoop (pin, onTimeSeconds, offTimeSeconds, verbose=False):
+	try:
+		while True:
+			wire.on()
+			if verbose:
+				print 'On'
+			time.sleep(onTimeSeconds)
+			wire.off()
+			if verbose:
+				print 'Off'
+			time.sleep(offTimeSeconds)
+	except:
+		print "Ending loop."
+
+# This formula was derived through empirical testing alone. The actual RPM may differ from what is expected.
+def rpmToMsDelay (rpm):
+	return 14110.1/math.pow(rpm,0.988567318803339)
+
+##############################################
+
+parser = argparse.ArgumentParser(description='Enables and disables a provided BCM pin at the provided rates.')
+parser.add_argument('-p', '--pin', type=int, dest='pin', default=17, help="The BCM pin number to toggle.")
+parser.add_argument('--on', type=int, dest='onTime', default=0, help="The duration, in milliseconds, for the pin to be enabled.")
+parser.add_argument('--off', type=int, dest='offTime', default=0, help="The duration, in milliseconds, for the pin to be disabled. By default, this value is the same as the ONTIME value.")
+parser.add_argument('-r', '--rpm', type=int, dest='rpm', default=0, help="Approximate RPM to pedal at.")
+parser.add_argument('-v', '--verbose', dest='verbose', action='store_true')
+
+args = None
+try:
+	args = parser.parse_args()
+except:
+	parser.print_help()
+	sys.exit(0)
+
+if args.verbose:
+	print args
+
+if args.pin < 1:
+	print "Missing BCM pin number."
+	parser.print_help()
+	sys.exit(1)
+
+if args.pin < 2:
+	print "Invalid BCM pin number."
+	parser.print_help()
+	sys.exit(1)
+
+wire = gpiozero.LED(args.pin)
+onSec = -1
+offSec = -1
+
+if args.onTime:
+	onSec = args.onTime / 1000.0
+	if (args.offTime):
+		offSec = args.offTime / 1000.0
+		print 'Beginning toggle loop at %ds on and %ds off.' % (onTime, offTime)
+	else:
+		offSec = onSec
+		print 'Beginning toggle loop at %ds on and off.' % onTime
+elif args.rpm:
+	onSec = rpmToMsDelay (args.rpm) / 1000.0
+	offSec = onSec
+	print 'Beginning toggle loop at approx. %d rpm (%s sec on and off)' % (args.rpm, str(onSec))
+
+if onSec < 0:
+	print "Invalid enabled millisecond duration or RPM."
+	parser.print_help()
+	sys.exit(1)
+
+if args.verbose:
+	print "On seconds: %s" % str(onSec)
+	print "Off seconds: %s" % str(offSec)
+
+blinkPinLoop (args.pin, onSec, offSec, args.verbose)
+print 'Exiting.'
+wire.off()
